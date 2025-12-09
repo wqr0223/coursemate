@@ -26,6 +26,9 @@ router.delete('/reviews/:reviewId', adminController.deleteReviewAdmin);
 // 6. 문의 답변
 router.post('/inquiries/:id/answer', adminController.answerInquiry);
 
+// ★ [신규 추가] 문의 상세 조회
+router.get('/inquiries/:id', adminController.getInquiryDetail);
+
 router.get('/feedbacks', communityController.getAllInquiries);
 
 router.post('/notice', communityController.createNotice);

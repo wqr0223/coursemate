@@ -126,25 +126,34 @@ exports.getMyFeedbacks = async (req, res) => {
 
 // 5. [관리자용] 전체 문의 조회 (이미 잘 구현되어 있을 경우 유지)
 exports.getAllInquiries = async (req, res) => {
-   // ... (기존 코드 유지)
-   let conn;
-   try {
-     conn = await pool.getConnection();
-     const query = `
-       SELECT i.INQUIRY_ID as id, u.NAME as userNickname, i.TITLE as title, 
-              i.CONTENT as content, i.STATUS as status, i.REG_DATE as createdAt
-       FROM INQUIRY i
-       LEFT JOIN USER u ON i.USER_ID = u.USER_ID
-       ORDER BY i.REG_DATE DESC
-     `;
-     const rows = await conn.query(query);
-     res.status(200).json({ result_code: 200, feedbacks: rows });
-   } catch (err) {
-     console.error(err);
-     res.status(500).json({ result_code: 500 });
-   } finally {
-     if (conn) conn.end();
-   }
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    // 1. USER 테이블을 백틱(`)으로 감싸기
+    // 2. u.NAME이 맞는지 확인 (만약 닉네임 컬럼이 u.NICKNAME이라면 수정 필요)
+    const query = `
+      SELECT 
+        i.INQUIRY_ID as id, 
+        u.NAME as userNickname, 
+        i.TITLE as title, 
+        i.CONTENT as content, 
+        i.STATUS as status, 
+        i.REG_DATE as createdAt
+      FROM INQUIRY i
+      LEFT JOIN \`USER\` u ON i.USER_ID = u.USER_ID 
+      ORDER BY i.REG_DATE DESC
+    `;
+
+    const rows = await conn.query(query);
+    
+    res.status(200).json({ result_code: 200, feedbacks: rows });
+  } catch (err) {
+    console.error("SQL 에러 발생:", err); // 서버 콘솔에서 이 에러를 꼭 확인하세요!
+    res.status(500).json({ result_code: 500 });
+  } finally {
+    if (conn) conn.release();
+  }
 };
 
 // 6. [관리자용] 공지사항 등록

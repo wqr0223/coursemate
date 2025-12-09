@@ -207,3 +207,50 @@ exports.getAllPlaces = async (req, res) => {
     if (conn) conn.end();
   }
 };
+
+
+// ★ [신규 추가] 11. 문의 상세 조회 (GET /api/admin/inquiries/:id)
+exports.getInquiryDetail = async (req, res) => {
+  let conn;
+  try {
+    const { id } = req.params;
+    conn = await pool.getConnection();
+
+    // 문의 내용과 작성자 정보를 함께 조회
+    const query = `
+      SELECT 
+        i.INQUIRY_ID, i.TITLE, i.CONTENT, i.STATUS, i.REG_DATE, 
+        i.ANSWER_CONTENT, i.ANSWER_DATE,
+        u.NAME as writerName, u.EMAIL as writerEmail
+      FROM INQUIRY i
+      LEFT JOIN USER u ON i.USER_ID = u.USER_ID
+      WHERE i.INQUIRY_ID = ?
+    `;
+    const rows = await conn.query(query, [id]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ result_code: 404, result_msg: "해당 문의를 찾을 수 없습니다." });
+    }
+
+    // 프론트엔드에서 쓰기 편하게 소문자로 변환해서 응답
+    const item = rows[0];
+    const inquiry = {
+      id: item.INQUIRY_ID,
+      title: item.TITLE,
+      content: item.CONTENT,
+      status: item.STATUS,
+      regDate: item.REG_DATE,
+      answerContent: item.ANSWER_CONTENT,
+      answerDate: item.ANSWER_DATE,
+      writerName: item.writerName,
+      writerEmail: item.writerEmail,
+    };
+
+    res.status(200).json({ result_code: 200, inquiry });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ result_code: 500, result_msg: "서버 오류" });
+  } finally {
+    if (conn) conn.end();
+  }
+};

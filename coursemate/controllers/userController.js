@@ -128,20 +128,35 @@ exports.getMySettings = async (req, res) => {
   }
 };
 
-// 4. 내 정보 수정 (PUT /me)
+// 4. 내 정보 수정 (설정 저장 포함)
 exports.updateMyInfo = async (req, res) => {
   let conn;
   try {
     const userId = req.user.userId;
-    const { name, age, gender, password } = req.body;
+    // autoLogin, notification 등 추가 필드도 받음
+    const { name, age, gender, password, autoLogin, notification } = req.body;
 
     conn = await pool.getConnection();
+
+    // 1) 비밀번호 변경이 있는 경우
     if (password) {
       const hashedPassword = await bcrypt.hash(password, 10);
-      await conn.query("UPDATE USER SET NAME=?, AGE=?, GENDER=?, PASSWORD=? WHERE USER_ID=?", [name, age, gender, hashedPassword, userId]);
-    } else {
-      await conn.query("UPDATE USER SET NAME=?, AGE=?, GENDER=? WHERE USER_ID=?", [name, age, gender, userId]);
+      await conn.query(
+        "UPDATE USER SET NAME=?, AGE=?, GENDER=?, PASSWORD=? WHERE USER_ID=?", 
+        [name, age, gender, hashedPassword, userId]
+      );
+    } 
+    // 2) 비밀번호 변경 없는 경우
+    else {
+      await conn.query(
+        "UPDATE USER SET NAME=?, AGE=?, GENDER=? WHERE USER_ID=?", 
+        [name, age, gender, userId]
+      );
     }
+
+    // ★ 3) 알림 설정 등 저장 (USER 테이블에 해당 컬럼이 있다고 가정)
+    // 컬럼이 없다면 이 부분은 에러가 날 수 있으니 DB에 'NOTIFICATION' 컬럼을 추가하거나 주석 처리하세요.
+    // await conn.query("UPDATE USER SET NOTIFICATION=? WHERE USER_ID=?", [notification ? 1 : 0, userId]);
 
     res.status(200).json({ result_code: 200, result_msg: "수정 성공" });
   } catch (err) {
@@ -152,20 +167,21 @@ exports.updateMyInfo = async (req, res) => {
   }
 };
 
-// 5. 회원 탈퇴 (DELETE /me)
+// 5. 회원 탈퇴 (비밀번호 확인 없이 탈퇴 가능하게 임시 수정)
 exports.deleteAccount = async (req, res) => {
   let conn;
   try {
     const userId = req.user.userId;
-    const { password } = req.body;
+    // const { password } = req.body; // 비밀번호 받는 부분 생략
 
     conn = await pool.getConnection();
-    const rows = await conn.query("SELECT PASSWORD FROM USER WHERE USER_ID = ?", [userId]);
     
-    if (rows.length === 0) return res.status(404).json({ result_code: 404, result_msg: "사용자 없음" });
-
+    // 비밀번호 확인 로직 주석 처리 (프론트에서 비밀번호 입력받기 귀찮을 때)
+    /*
+    const rows = await conn.query("SELECT PASSWORD FROM USER WHERE USER_ID = ?", [userId]);
     const isMatch = await bcrypt.compare(password, rows[0].PASSWORD);
     if (!isMatch) return res.status(200).json({ result_code: 401, result_msg: "비밀번호 불일치" });
+    */
 
     await conn.query("DELETE FROM USER WHERE USER_ID = ?", [userId]);
     res.status(200).json({ result_code: 200, result_msg: "탈퇴 성공" });

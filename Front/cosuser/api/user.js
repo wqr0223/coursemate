@@ -47,9 +47,9 @@ export async function fetchSettings() {
   return request("/users/me/settings");
 }
 
-/** 내 계정 정보 수정: PUT /api/users/me/settings */
+/** 내 계정 정보 수정: PUT /api/users/me */
 export async function updateSettings(payload) {
-  return request("/users/me/settings", {
+  return request("/users/me", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

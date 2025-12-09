@@ -134,3 +134,11 @@ export async function answerInquiry(inquiryId, payload) {
   });
 }
 
+// ★ [신규 추가] 문의 상세 조회 함수
+export async function fetchInquiryDetail(inquiryId) {
+  const res = await request(`/api/admin/inquiries/${inquiryId}`, {
+    method: "GET",
+    auth: true,
+  });
+  return res?.inquiry || null;
+}

@@ -11,7 +11,7 @@ export async function fetchNoticeDetail(id) {
 }
 
 /** 불편사항/문의 등록: POST /api/community/feedback */
-export async function sendFeedback({ title, content }) {
+export async function createFeedback({ title, content }) {
   return request("/community/feedback", {
     method: "POST",
     body: JSON.stringify({ title, content }),

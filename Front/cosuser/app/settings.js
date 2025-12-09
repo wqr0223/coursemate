@@ -7,18 +7,21 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
+  Platform, // ★ 1. Platform 추가
 } from "react-native";
+import { useRouter } from "expo-router"; // ★ useRouter 추가
 import { fetchSettings, updateSettings, deleteAccount } from "../api/user";
 import { useAuth } from "../hooks/useAuth";
 
 export default function SettingsScreen() {
+  const router = useRouter(); // 라우터 초기화
   const { logout } = useAuth();
 
   const [loading, setLoading] = useState(true);
 
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
-  const [gender, setGender] = useState(""); // "M" / "F" 등
+  const [gender, setGender] = useState("");
   const [autoLogin, setAutoLogin] = useState(true);
   const [notification, setNotification] = useState(true);
 
@@ -26,16 +29,15 @@ export default function SettingsScreen() {
     const load = async () => {
       try {
         const data = await fetchSettings();
-        // 서버 응답 구조에 맞게 조정 필요
         const s = data?.setting || data || {};
         setName(s.name || "");
         setAge(s.age != null ? String(s.age) : "");
         setGender(s.gender || "");
+        // DB에 컬럼이 없다면 기본값 true로 설정
         setAutoLogin(s.autoLogin ?? true);
         setNotification(s.notification ?? true);
       } catch (e) {
         console.error(e);
-        Alert.alert("오류", "설정을 불러오는 중 문제가 발생했습니다.");
       } finally {
         setLoading(false);
       }
@@ -45,95 +47,90 @@ export default function SettingsScreen() {
 
   const onSave = async () => {
     try {
-      await updateSettings({
-        name,
-        age: age ? Number(age) : null,
-        gender,
-        autoLogin,
-        notification,
+      // API 호출 (이름, 나이, 성별, 설정값 등 전송)
+      await updateSettings({ 
+        name, 
+        age: Number(age), 
+        gender, 
+        autoLogin, 
+        notification 
       });
-      Alert.alert("완료", "설정이 저장되었습니다.");
+
+      // ★ 2. 웹/앱 분기 알림
+      if (Platform.OS === 'web') {
+        window.alert("완료: 설정이 저장되었습니다.");
+        router.replace("/my-page"); // 마이페이지로 이동
+      } else {
+        Alert.alert("완료", "설정이 저장되었습니다.", [
+            { text: "확인", onPress: () => router.replace("/my-page") }
+        ]);
+      }
     } catch (e) {
       console.error(e);
-      Alert.alert("오류", "설정 저장에 실패했습니다.");
+      const msg = "설정 저장 실패";
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert("오류", msg);
     }
   };
 
   const onDeleteAccount = () => {
-    Alert.alert(
-      "회원탈퇴",
-      "정말 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
-      [
+    const msg = "정말로 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.";
+    
+    // ★ 3. 회원탈퇴 확인 팝업 (웹/앱 분기)
+    if (Platform.OS === 'web') {
+      if (window.confirm(msg)) {
+        handleRealDelete();
+      }
+    } else {
+      Alert.alert("회원 탈퇴", msg, [
         { text: "취소", style: "cancel" },
-        {
-          text: "탈퇴",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteAccount();
-              Alert.alert("완료", "회원탈퇴가 처리되었습니다.", [
-                {
-                  text: "확인",
-                  onPress: () => logout(),
-                },
-              ]);
-            } catch (e) {
-              console.error(e);
-              Alert.alert("오류", "회원탈퇴 처리 중 문제가 발생했습니다.");
-            }
-          },
-        },
-      ]
-    );
+        { text: "탈퇴", style: "destructive", onPress: handleRealDelete },
+      ]);
+    }
   };
 
-  if (loading) {
-    return (
-      <View
-        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-      >
-        <Text>설정을 불러오는 중...</Text>
-      </View>
-    );
-  }
+  const handleRealDelete = async () => {
+    try {
+      // 주의: 백엔드 deleteAccount가 비밀번호를 요구한다면, 
+      // 여기서 비밀번호 입력 모달을 띄우거나 API를 수정해야 합니다.
+      // 현재는 일단 호출만 하도록 작성됨.
+      await deleteAccount(); 
+      
+      if (Platform.OS === 'web') {
+        window.alert("탈퇴가 완료되었습니다.");
+        router.replace("/login");
+      } else {
+        Alert.alert("완료", "탈퇴가 완료되었습니다.", [
+          { text: "확인", onPress: () => router.replace("/login") }
+        ]);
+      }
+      logout(); // 로그아웃 처리
+    } catch (e) {
+      console.error(e);
+      const msg = "탈퇴 처리에 실패했습니다. (비밀번호 확인 필요)";
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert("오류", msg);
+    }
+  };
 
   return (
-    <View style={{ flex: 1, padding: 16 }}>
-      <Text style={{ fontSize: 22, fontWeight: "700", marginBottom: 16 }}>
+    <View style={{ flex: 1, padding: 16, backgroundColor: '#fff' }}>
+      <Text style={{ fontSize: 20, fontWeight: "700", marginBottom: 20 }}>
         환경 설정
       </Text>
 
-      {/* 계정 정보 섹션 */}
-      <Text style={{ fontSize: 16, fontWeight: "600", marginBottom: 8 }}>
-        계정 정보
-      </Text>
-
       <Text style={label}>이름</Text>
-      <TextInput
-        value={name}
-        onChangeText={setName}
-        style={input}
-        placeholder="이름"
-      />
+      <TextInput style={input} value={name} onChangeText={setName} />
 
       <Text style={label}>나이</Text>
-      <TextInput
-        value={age}
-        onChangeText={setAge}
-        keyboardType="numeric"
-        style={input}
-        placeholder="나이"
+      <TextInput 
+        style={input} 
+        value={age} 
+        onChangeText={setAge} 
+        keyboardType="numeric" 
       />
 
-      <Text style={label}>성별</Text>
-      <TextInput
-        value={gender}
-        onChangeText={setGender}
-        style={input}
-        placeholder="예: M / F"
-      />
+      <Text style={label}>성별 (M/F)</Text>
+      <TextInput style={input} value={gender} onChangeText={setGender} />
 
-      {/* 로그인 / 서비스 설정 섹션 */}
       <View
         style={{
           marginTop: 24,
@@ -147,12 +144,12 @@ export default function SettingsScreen() {
         </Text>
 
         <View style={row}>
-          <Text>자동 로그인</Text>
+          <Text style={{ fontSize: 15 }}>자동 로그인</Text>
           <Switch value={autoLogin} onValueChange={setAutoLogin} />
         </View>
 
         <View style={row}>
-          <Text>알림 받기</Text>
+          <Text style={{ fontSize: 15 }}>알림 받기</Text>
           <Switch value={notification} onValueChange={setNotification} />
         </View>
       </View>
@@ -174,6 +171,7 @@ const label = {
   marginTop: 12,
   marginBottom: 4,
   fontWeight: "500",
+  color: "#333"
 };
 
 const input = {
@@ -181,6 +179,8 @@ const input = {
   borderColor: "#ccc",
   borderRadius: 8,
   padding: 10,
+  fontSize: 14,
+  backgroundColor: "#f9f9f9"
 };
 
 const row = {
@@ -191,16 +191,16 @@ const row = {
 };
 
 const btnPrimary = {
-  marginTop: 24,
+  marginTop: 30,
   backgroundColor: "#4F46E5",
-  paddingVertical: 12,
+  paddingVertical: 14,
   borderRadius: 8,
   alignItems: "center",
 };
 
 const btnDanger = {
-  marginTop: 12,
-  paddingVertical: 12,
+  marginTop: 16,
+  paddingVertical: 14,
   borderRadius: 8,
   borderWidth: 1,
   borderColor: "#EF4444",
